@@ -3,6 +3,7 @@ const User = require("../models/user");
 const { registerValidation, loginValidation } = require("../validation");
 const bcrypt = require("bcryptjs");
 const Jwt = require("jsonwebtoken");
+const verifyToken = require("./verifyToken");
 
 router.post("/register", async (req, res) => {
   const { error } = registerValidation(req.body);
@@ -27,7 +28,7 @@ router.post("/register", async (req, res) => {
     name,
     email,
     password: hashedPassword,
-    role: role || "user", // If role is provided, use it; otherwise, default to 'user'
+    role: role || "user",
   });
 
   const savedUser = await newUser.save();
@@ -70,4 +71,25 @@ router.post("/login", async (req, res) => {
   });
 });
 
+// get all users
+router.get("/", verifyToken, async (req, res) => {
+  try {
+    if (req.user.role !== "admin")
+      return res.status(404).json({
+        status: "Fail",
+        message: "Only authorized users can perform this action.",
+      });
+    const allUsers = await User.find();
+    res.status(200).json({
+      status: "Success",
+      length: allUsers.length,
+      data: allUsers,
+    });
+  } catch (error) {
+    res.status(400).json({
+      status: "Fail",
+      message: "Cannot fetch all users.",
+    });
+  }
+});
 module.exports = router;
