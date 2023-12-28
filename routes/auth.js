@@ -4,6 +4,8 @@ const { registerValidation, loginValidation } = require("../validation");
 const bcrypt = require("bcryptjs");
 const Jwt = require("jsonwebtoken");
 const verifyToken = require("./verifyToken");
+const nodeMailer = require("nodemailer");
+const transporter = require("../transporter/transporter");
 
 router.post("/register", async (req, res) => {
   const { error } = registerValidation(req.body);
@@ -89,6 +91,51 @@ router.get("/", verifyToken, async (req, res) => {
     res.status(400).json({
       status: "Fail",
       message: "Cannot fetch all users.",
+    });
+  }
+});
+
+// forgot password
+router.post("/forgot-password", async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email: email });
+    if (!user)
+      return res.status(400).json({
+        status: "Fail",
+        message: "Email does not exist",
+      });
+
+    const resetToken = Jwt.sign(
+      { userId: user._id },
+      process.env.TOKEN_SECRET,
+      { expiresIn: "1h" }
+    );
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = Date.now() + 3600000;
+
+    await user.save();
+
+    const resetLink = `http://localhost:8000/reset-password/${resetToken}`;
+    const mailOptions = {
+      from: "codeathon2030@gmail.com",
+      to: user.email,
+      subject: "Password Reset Request",
+      html: `Click <a href="${resetLink}">here</a> to reset your password.`,
+    };
+
+    transporter.sendMail(mailOptions, (err, info) => {
+      if (err) return res.status(400).send(err.message);
+      res.status(200).json({
+        status: "Success",
+        message: "Reset link sent successfully",
+        data: info.response,
+      });
+    });
+  } catch (error) {
+    res.status(400).json({
+      status: "Fail",
+      message: error.message,
     });
   }
 });

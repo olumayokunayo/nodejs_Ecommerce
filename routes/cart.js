@@ -4,28 +4,32 @@ const verifyToken = require("./verifyToken");
 
 const router = require("express").Router();
 
-// cart items
+// cart item
 router.post("/cart", verifyToken, async (req, res) => {
   try {
     const userId = req.user._id;
-    // console.log(userId);
     const { productId, quantity } = req.body;
-
     const user = await User.findById(userId);
-    // console.log(user);
     if (!user)
       return res.status(400).json({
         status: "Fail",
         message: "User not found",
       });
 
+    // check product stock quantity
+    const product = await Product.findById(productId);
+    const productStock = product.stockQuantity;
+    if (quantity > productStock)
+      return res.status(400).json({
+        status: "Fail",
+        message: `Stock level is low: ${productStock}`,
+      });
     const productToAdd = {
       productId,
       quantity: quantity || 1,
     };
 
     user.cart.push(productToAdd);
-
     await user.save();
     res.status(200).json({
       status: "Success",
@@ -53,9 +57,7 @@ router.get("/cart", verifyToken, async (req, res) => {
 
     const populatedCart = await Promise.all(
       cartItems.map(async (cartItem) => {
-        console.log(cartItem);
         const product = await Product.findById(cartItem.productId);
-        console.log(product);
         return {
           product,
           quantity: cartItem.quantity,
@@ -80,12 +82,11 @@ router.get("/cart", verifyToken, async (req, res) => {
   }
 });
 
-// update cart
+// update cart - not working yet
 router.patch("/cart/:id", verifyToken, async (req, res) => {
   try {
     const userId = req.user._id;
     const cardItemId = req.params.id;
-    console.log(cardItemId);
     const user = await User.findById(userId);
     if (!user)
       return res.status(400).json({
@@ -96,15 +97,14 @@ router.patch("/cart/:id", verifyToken, async (req, res) => {
     const cartIndex = user.cart.findIndex(
       (item) => item._id.toString() === cardItemId.toString()
     );
-    console.log(cartIndex);
     if (cartIndex === -1) {
       return res.status(404).json({
         status: "Fail",
         message: "Cart item not found",
       });
     }
-    user.cart[cartIndex].quantity = req.body.quantity;
 
+    user.cart[cartIndex].quantity = req.body.quantity;
     await user.save();
     res.status(200).json({
       status: "Success",
@@ -118,4 +118,29 @@ router.patch("/cart/:id", verifyToken, async (req, res) => {
   }
 });
 
+// delete cart item
+router.delete("/cart/:id", verifyToken, async (req, res) => {
+  try {
+    const productId = req.params.id;
+    const userId = req.user._id;
+    const user = await User.findById(userId);
+    if (!user)
+      return res.status(400).json({
+        status: "Fail",
+        message: "User not found",
+      });
+
+    const product = await Product.findByIdAndDelete(productId);
+    res.status(200).json({
+      status: "Success",
+      message: "Product deleted succesfully",
+      data: product,
+    });
+  } catch (error) {
+    res.status(400).json({
+      status: "Fail",
+      message: error.message,
+    });
+  }
+});
 module.exports = router;

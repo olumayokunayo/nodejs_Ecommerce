@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const Product = require("../models/product");
 const verifyToken = require("./verifyToken");
-
+const axios = require("axios");
 // create/post products - admin
 router.post("/products", verifyToken, async (req, res) => {
   try {
@@ -183,7 +183,6 @@ router.get("/products/filter/category", async (req, res) => {
 router.get("/products/search", async (req, res) => {
   try {
     const { query } = req.query;
-    console.log(query);
     const results = await Product.aggregate([
       {
         $search: {
@@ -212,9 +211,7 @@ router.get("/products/search", async (req, res) => {
 router.get("/products/:id/stock", async (req, res) => {
   try {
     const productId = req.params.id;
-    console.log(productId);
     const product = await Product.findById(productId);
-    console.log(product);
     if (!product)
       return res.status(400).json({
         status: "Fail",
@@ -257,6 +254,7 @@ router.patch("/products/:id/stock", verifyToken, async (req, res) => {
 
     product.stockQuantity = stockQuantity;
     await product.save();
+
     res.status(200).json({
       status: "Success",
       productId,
@@ -270,4 +268,21 @@ router.patch("/products/:id/stock", verifyToken, async (req, res) => {
   }
 });
 
+// fetch products data from external data
+router.get("/fetch-external-api", async (req, res) => {
+  try {
+    const response = await axios.get("https://fakestoreapi.com/products");
+    const data = response.data;
+    res.status(200).json({
+      status: "Success",
+      length: data.length,
+      data: data,
+    });
+  } catch (error) {
+    res.status(200).json({
+      status: "Fail",
+      message: error.message,
+    });
+  }
+});
 module.exports = router;
